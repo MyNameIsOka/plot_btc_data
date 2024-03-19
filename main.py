@@ -15,12 +15,13 @@ from PySide6.QtCore import Qt, QDate
 import sys
 import csv
 from datetime import datetime
-from matplotlib import pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 import numpy as np
 from collections import defaultdict
-from matplotlib.colors import Normalize
+from matplotlib.colors import LinearSegmentedColormap
+import matplotlib.pyplot as plt
+
 
 app = QApplication(sys.argv)
 
@@ -449,7 +450,7 @@ class MainWindow(QMainWindow):
         return heatmap_data, min_change, max_change
 
     def showHeatmap(self):
-        heatmap_data, _, _ = self.processDataForHeatmap(
+        heatmap_data, min_val, max_val = self.processDataForHeatmap(
             self.startDateEdit.text(), self.endDateEdit.text()
         )
 
@@ -457,8 +458,18 @@ class MainWindow(QMainWindow):
         self.figure.clear()
         self.figure.subplots_adjust(bottom=0.1)
         ax = self.figure.add_subplot(111)
-        cax = ax.matshow(heatmap_data, cmap="RdBu")
-        self.figure.colorbar(cax)
+
+        cmap = LinearSegmentedColormap.from_list(
+            name="red_green", colors=["red", "white", "green"]
+        )
+
+        norm = plt.Normalize(vmin=min_val, vmax=max_val)
+
+        cax = ax.matshow(heatmap_data, cmap=cmap, norm=norm)
+
+        # Add a colorbar
+        cbar = self.figure.colorbar(cax, ax=ax)
+        cbar.set_label("Average % Change")
 
         # Annotate each cell
         for i in range(heatmap_data.shape[0]):
