@@ -24,9 +24,7 @@ class MainWindow(QMainWindow):
 
     def initUI(self):
         self.setWindowTitle("CSV Viewer")
-        self.setGeometry(
-            100, 100, 400, 400
-        )  # Set position and size (x, y, width, height)
+        self.setGeometry(100, 100, 800, 600)
         self.setMinimumSize(800, 600)
 
         # Central Widget and Layout
@@ -44,6 +42,20 @@ class MainWindow(QMainWindow):
         self.canvas = FigureCanvas(self.figure)
         layout.addWidget(self.canvas)
 
+        # Button to show the initial graph
+        self.showGraphButton = QPushButton("Show Graph", self)
+        self.showGraphButton.clicked.connect(self.showGraph)
+        layout.addWidget(self.showGraphButton)
+        self.showGraphButton.hide()  # Initially hide this button
+
+        # Button to show the average % changes on weekday
+        self.showAvgChangesButton = QPushButton(
+            "Show Average % Changes on Weekday", self
+        )
+        self.showAvgChangesButton.clicked.connect(self.showAvgChanges)
+        layout.addWidget(self.showAvgChangesButton)
+        self.showAvgChangesButton.hide()  # Initially hide this button
+
     def openFileDialog(self):
         fileName, _ = QFileDialog.getOpenFileName(
             self, "Open CSV File", "", "CSV Files (*.csv)"
@@ -53,13 +65,15 @@ class MainWindow(QMainWindow):
 
     def loadData(self, filePath):
         with open(filePath, "r", newline="", encoding="utf-8") as csvfile:
-            # Sniff to detect the delimiter
             delimiter = csv.Sniffer().sniff(csvfile.readline()).delimiter
-            csvfile.seek(0)  # Go back to the start of the file
-
+            csvfile.seek(0)
             reader = csv.DictReader(csvfile, delimiter=delimiter)
-            rows = list(reader)
-            self.plotData(rows)
+            self.rows = list(reader)  # Store the data in an instance variable
+            self.plotData(self.rows)
+
+            # Show the buttons after data is loaded
+            self.showGraphButton.show()
+            self.showAvgChangesButton.show()
 
     def plotData(self, rows):
         self.figure.clear()  # Clear the existing plot
@@ -100,6 +114,17 @@ class MainWindow(QMainWindow):
         ax.set_ylabel("Close")
         ax.grid(True)
         self.canvas.draw()
+
+    def showGraph(self):
+        # Assuming self.rows stores the CSV data
+        self.plotData(self.rows)
+
+    def showAvgChanges(self):
+        # Placeholder for now
+        # Logic to calculate and show the average % changes plot will go here
+        print(
+            "Average % Changes on Weekday plot functionality will be implemented here."
+        )
 
 
 if __name__ == "__main__":
