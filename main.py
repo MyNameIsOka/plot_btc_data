@@ -131,17 +131,39 @@ class MainWindow(QMainWindow):
         self.endDateEdit.hide()
 
     def toggleDateSelectors(self, show_next_to=None):
-        # Ensure the widgets are in their respective layout
-        if self.dateSelectionLayout not in (self.avgChangesLayout, self.heatmapLayout):
-            # Add date selection layout to the main layout just once
-            self.avgChangesLayout.addLayout(self.dateSelectionLayout)
+        # Hide all date selection widgets initially
+        self.startLabel.setVisible(False)
+        self.startDateEdit.setVisible(False)
+        self.endLabel.setVisible(False)
+        self.endDateEdit.setVisible(False)
 
-        # Now manage the visibility based on the button clicked
-        isVisible = show_next_to == "avgChanges" or show_next_to == "heatmap"
-        self.startLabel.setVisible(isVisible)
-        self.startDateEdit.setVisible(isVisible)
-        self.endLabel.setVisible(isVisible)
-        self.endDateEdit.setVisible(isVisible)
+        # Based on the button clicked, show the date selectors next to the appropriate button
+        if show_next_to == "avgChanges":
+            # Display the date selectors for the "Show Average % Changes on Weekday" button
+            self.startLabel.setVisible(True)
+            self.startDateEdit.setVisible(True)
+            self.endLabel.setVisible(True)
+            self.endDateEdit.setVisible(True)
+
+            # Ensure the layout for date selectors is properly managed
+            self.avgChangesLayout.addWidget(self.startLabel)
+            self.avgChangesLayout.addWidget(self.startDateEdit)
+            self.avgChangesLayout.addWidget(self.endLabel)
+            self.avgChangesLayout.addWidget(self.endDateEdit)
+
+        elif show_next_to == "heatmap":
+            # Display the date selectors for the "Show heatmap per day" button
+            self.startLabel.setVisible(True)
+            self.startDateEdit.setVisible(True)
+            self.endLabel.setVisible(True)
+            self.endDateEdit.setVisible(True)
+
+            # Move date selection widgets to the heatmap layout
+            # Note: If moving widgets causes issues, consider creating separate widgets for each layout or managing visibility without moving.
+            self.heatmapLayout.addWidget(self.startLabel)
+            self.heatmapLayout.addWidget(self.startDateEdit)
+            self.heatmapLayout.addWidget(self.endLabel)
+            self.heatmapLayout.addWidget(self.endDateEdit)
 
     def showStartDateCalendar(self, event):
         if not hasattr(self, "startDateCalendar"):
