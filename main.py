@@ -116,26 +116,35 @@ class MainWindow(QMainWindow):
         )  # Add the horizontal layout to the main layout
 
     def showStartDateCalendar(self, event):
-        self.startDateCalendar = QCalendarWidget()
-        self.startDateCalendar.setGridVisible(True)
-        self.startDateCalendar.selectedDate().connect(self.updateStartDate)
-        self.startDateCalendar.setWindowModality(Qt.ApplicationModal)
+        if not hasattr(self, "startDateCalendar"):
+            self.startDateCalendar = QCalendarWidget()
+            self.startDateCalendar.setGridVisible(True)
+            self.startDateCalendar.clicked.connect(self.updateStartDate)
+            self.startDateCalendar.setWindowModality(Qt.ApplicationModal)
         self.startDateCalendar.show()
 
     def updateStartDate(self, date):
+        # Update the QLineEdit to show the selected date
         self.startDateEdit.setText(date.toString("yyyy-MM-dd"))
+        # Trigger re-plot if the current plot is avgChanges
+        if self.currentPlot == "avgChanges":
+            self.showAvgChanges()
         self.startDateCalendar.close()
 
     def showEndDateCalendar(self):
-        # Initialize the calendar widget
-        self.endDateCalendar = QCalendarWidget()
-        self.endDateCalendar.setGridVisible(True)
-        self.endDateCalendar.selectedDate().connect(self.updateEndDate)
-        self.endDateCalendar.setWindowModality(Qt.ApplicationModal)
+        if not hasattr(self, "endDateCalendar"):
+            self.endDateCalendar = QCalendarWidget()
+            self.endDateCalendar.setGridVisible(True)
+            self.endDateCalendar.clicked.connect(self.updateEndDate)
+            self.endDateCalendar.setWindowModality(Qt.ApplicationModal)
         self.endDateCalendar.show()
 
     def updateEndDate(self, date):
+        # Update the QLineEdit to show the selected date
         self.endDateEdit.setText(date.toString("yyyy-MM-dd"))
+        # Trigger re-plot if the current plot is avgChanges
+        if self.currentPlot == "avgChanges":
+            self.showAvgChanges()
         self.endDateCalendar.close()
 
     def openFileDialog(self):
@@ -217,8 +226,19 @@ class MainWindow(QMainWindow):
             )
             return {}
 
+        # Parse the start and end dates from the QLineEdit widgets
+        start_date = datetime.strptime(self.startDateEdit.text(), "%Y-%m-%d").date()
+        end_date = datetime.strptime(self.endDateEdit.text(), "%Y-%m-%d").date()
+
+        # Filter rows for those within the selected date range
+        filtered_rows = [
+            row
+            for row in self.rows
+            if start_date <= self.parseDate(row["date"]).date() <= end_date
+        ]
+
         changes = defaultdict(lambda: {"total": 0, "count": 0})
-        sorted_rows = sorted(self.rows, key=lambda x: self.parseDate(x["date"]))
+        sorted_rows = sorted(filtered_rows, key=lambda x: self.parseDate(x["date"]))
 
         for i in range(1, len(sorted_rows)):
             prev_row = sorted_rows[i - 1]
@@ -258,8 +278,6 @@ class MainWindow(QMainWindow):
         self.endDateEdit.hide()
 
     def showAvgChanges(self):
-        if self.currentPlot == "avgChanges":
-            return  # Do nothing if already shown
 
         avg_changes = self.calculateAvgPercentageChanges()
 
