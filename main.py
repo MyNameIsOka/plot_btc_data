@@ -52,13 +52,15 @@ class MainWindow(QMainWindow):
         self.figure = Figure()
         self.canvas = FigureCanvas(self.figure)
         mainLayout.addWidget(self.canvas, 1)
+
         # Horizontal layout for buttons
-        buttonsLayout = QHBoxLayout()
+        self.buttonsLayout = QHBoxLayout()
+        mainLayout.addLayout(self.buttonsLayout)
 
         # Button to open CSV file
         self.openCsvButton = QPushButton("Open CSV File", self)
         self.openCsvButton.clicked.connect(self.openFileDialog)
-        mainLayout.addWidget(self.openCsvButton)
+        self.buttonsLayout.addWidget(self.openCsvButton)
 
         # Button to show the initial graph
         self.showGraphButton = QPushButton("Show Graph", self)
@@ -72,48 +74,55 @@ class MainWindow(QMainWindow):
             "Show Average % Changes on Weekday", self
         )
         self.showAvgChangesButton.clicked.connect(self.showAvgChanges)
-        buttonsLayout.addWidget(
-            self.showAvgChangesButton, 50
-        )  # Adding to horizontal layout with stretch factor
+        self.buttonsLayout.addWidget(self.showAvgChangesButton, 50)
         self.showAvgChangesButton.hide()  # Initially hide this button
 
-        # Layout for date selection
-        dateSelectionLayout = QHBoxLayout()
+        # Button to show the heatmap per day
+        self.showHeatmapButton = QPushButton("Show heatmap per day", self)
+        self.showHeatmapButton.clicked.connect(self.showHeatmap)
+        self.buttonsLayout.addWidget(self.showHeatmapButton)
+        self.showHeatmapButton.hide()  # Initially hide this button
 
-        # Start Date Label and Text Field
+        # Shared Layout for date selection, not added to the main layout initially
+        self.dateSelectionLayout = QHBoxLayout()
+
+        # Start and End Date Label and Text Field
         self.startLabel = QLabel("Start:", self)
-        dateSelectionLayout.addWidget(self.startLabel)
-
+        self.dateSelectionLayout.addWidget(self.startLabel)
         self.startDateEdit = QLineEdit(self)
-        self.startDateEdit.setReadOnly(True)  # Make it read-only
-        self.startDateEdit.mousePressEvent = (
-            self.showStartDateCalendar
-        )  # Open calendar on click
-        dateSelectionLayout.addWidget(self.startDateEdit)
+        self.startDateEdit.setReadOnly(True)
+        self.startDateEdit.mousePressEvent = self.showStartDateCalendar
+        self.dateSelectionLayout.addWidget(self.startDateEdit)
 
-        # End Date Label and Text Field
         self.endLabel = QLabel("End:", self)
-        dateSelectionLayout.addWidget(self.endLabel)
-
+        self.dateSelectionLayout.addWidget(self.endLabel)
         self.endDateEdit = QLineEdit(self)
-        self.endDateEdit.setReadOnly(True)  # Make it read-only
-        self.endDateEdit.mousePressEvent = (
-            self.showEndDateCalendar
-        )  # Open calendar on click
-        dateSelectionLayout.addWidget(self.endDateEdit)
+        self.endDateEdit.setReadOnly(True)
+        self.endDateEdit.mousePressEvent = self.showEndDateCalendar
+        self.dateSelectionLayout.addWidget(self.endDateEdit)
 
         # Initially hide the date selection UI elements
-        self.startLabel.hide()
-        self.startDateEdit.hide()
-        self.endLabel.hide()
-        self.endDateEdit.hide()
+        self.toggleDateSelectors()  # Call with no arguments to hide
 
-        # Adding date selection layout to the main buttons layout
-        buttonsLayout.addLayout(dateSelectionLayout)
+    def toggleDateSelectors(self, show_next_to=None):
+        # Remove the date selection layout from its current parent
+        if self.dateSelectionLayout.parent():
+            self.dateSelectionLayout.parent().removeItem(self.dateSelectionLayout)
 
-        mainLayout.addLayout(
-            buttonsLayout
-        )  # Add the horizontal layout to the main layout
+        # Depending on the button clicked, add the date selectors next to the appropriate button
+        if show_next_to == "avgChanges":
+            # Insert date selection layout next to the "Show Average % Changes on Weekday" button
+            self.buttonsLayout.insertLayout(2, self.dateSelectionLayout)
+        elif show_next_to == "heatmap":
+            # Insert date selection layout next to the "Show heatmap per day" button
+            self.buttonsLayout.insertLayout(3, self.dateSelectionLayout)
+
+        # Show or hide the date selection widgets
+        show = show_next_to is not None
+        self.startLabel.setVisible(show)
+        self.startDateEdit.setVisible(show)
+        self.endLabel.setVisible(show)
+        self.endDateEdit.setVisible(show)
 
     def showStartDateCalendar(self, event):
         if not hasattr(self, "startDateCalendar"):
@@ -224,6 +233,7 @@ class MainWindow(QMainWindow):
             )
             self.showGraphButton.show()
             self.showAvgChangesButton.show()
+            self.showHeatmapButton.show()
             self.startLabel.hide()
             self.startDateEdit.hide()
             self.endLabel.hide()
@@ -320,7 +330,6 @@ class MainWindow(QMainWindow):
         self.endDateEdit.hide()
 
     def showAvgChanges(self):
-
         avg_changes = self.calculateAvgPercentageChanges()
 
         # Check if there's data to plot
@@ -355,6 +364,22 @@ class MainWindow(QMainWindow):
         self.startDateEdit.show()
         self.endLabel.show()
         self.endDateEdit.show()
+
+        self.toggleDateSelectors("avgChanges")
+
+    def showHeatmap(self):
+        # Placeholder for the heatmap generation logic
+        print("Heatmap generation logic goes here")
+
+        # Update UI elements for the heatmap
+        self.startLabel.show()
+        self.startDateEdit.show()
+        self.endLabel.show()
+        self.endDateEdit.show()
+
+        self.currentPlot = "heatmap"  # Update the current plot state
+
+        self.toggleDateSelectors("heatmap")
 
 
 if __name__ == "__main__":
