@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
 )
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QDate
 import sys
 import csv
 from datetime import datetime
@@ -51,7 +51,7 @@ class MainWindow(QMainWindow):
         # Matplotlib Figure
         self.figure = Figure()
         self.canvas = FigureCanvas(self.figure)
-        mainLayout.addWidget(self.canvas)
+        mainLayout.addWidget(self.canvas, 1)
         # Horizontal layout for buttons
         buttonsLayout = QHBoxLayout()
 
@@ -124,12 +124,20 @@ class MainWindow(QMainWindow):
         self.startDateCalendar.show()
 
     def updateStartDate(self, date):
-        # Update the QLineEdit to show the selected date
-        self.startDateEdit.setText(date.toString("yyyy-MM-dd"))
-        # Trigger re-plot if the current plot is avgChanges
+        selectedDate = date.toPython()  # Convert QDate to python datetime.date
+        endDate = datetime.strptime(self.endDateEdit.text(), "%Y-%m-%d").date()
+
+        # Ensure the selected start date is not after the end date
+        if selectedDate > endDate:
+            endDate = selectedDate
+            self.endDateEdit.setText(endDate.strftime("%Y-%m-%d"))
+
+        self.startDateEdit.setText(selectedDate.strftime("%Y-%m-%d"))
+        self.startDateCalendar.close()
+
+        # Trigger re-plot if appropriate
         if self.currentPlot == "avgChanges":
             self.showAvgChanges()
-        self.startDateCalendar.close()
 
     def showEndDateCalendar(self, event):
         if not hasattr(self, "endDateCalendar"):
@@ -140,12 +148,20 @@ class MainWindow(QMainWindow):
         self.endDateCalendar.show()
 
     def updateEndDate(self, date):
-        # Update the QLineEdit to show the selected date
-        self.endDateEdit.setText(date.toString("yyyy-MM-dd"))
-        # Trigger re-plot if the current plot is avgChanges
+        selectedDate = date.toPython()  # Convert QDate to python datetime.date
+        startDate = datetime.strptime(self.startDateEdit.text(), "%Y-%m-%d").date()
+
+        # Ensure the selected end date is not before the start date
+        if selectedDate < startDate:
+            startDate = selectedDate
+            self.startDateEdit.setText(startDate.strftime("%Y-%m-%d"))
+
+        self.endDateEdit.setText(selectedDate.strftime("%Y-%m-%d"))
+        self.endDateCalendar.close()
+
+        # Trigger re-plot if appropriate
         if self.currentPlot == "avgChanges":
             self.showAvgChanges()
-        self.endDateCalendar.close()
 
     def openFileDialog(self):
         fileName, _ = QFileDialog.getOpenFileName(
@@ -155,18 +171,26 @@ class MainWindow(QMainWindow):
             self.loadData(fileName)
 
     def initializeDateRange(self):
-        # Example: Assuming self.rows is a list of dictionaries with 'date' keys
         dates = [
             self.parseDate(row["date"])
             for row in self.rows
             if self.parseDate(row["date"])
         ]
         if dates:
-            self.startDateEdit.setText(min(dates).strftime("%Y-%m-%d"))
-            self.endDateEdit.setText(max(dates).strftime("%Y-%m-%d"))
-        else:
-            self.startDateEdit.clear()
-            self.endDateEdit.clear()
+            minDate = min(dates)
+            maxDate = max(dates)
+            self.startDateEdit.setText(minDate.strftime("%Y-%m-%d"))
+            self.endDateEdit.setText(maxDate.strftime("%Y-%m-%d"))
+
+        # Convert datetime.date to QDate
+        qMinDate = QDate(minDate.year, minDate.month, minDate.day)
+        qMaxDate = QDate(maxDate.year, maxDate.month, maxDate.day)
+
+        # Assuming the calendar widgets are initialized here or elsewhere before this method is called
+        self.startDateCalendar.setMinimumDate(qMinDate)
+        self.startDateCalendar.setMaximumDate(qMaxDate)
+        self.endDateCalendar.setMinimumDate(qMinDate)
+        self.endDateCalendar.setMaximumDate(qMaxDate)
 
     def loadData(self, filePath):
         with open(filePath, "r", newline="", encoding="utf-8") as csvfile:
@@ -196,6 +220,7 @@ class MainWindow(QMainWindow):
 
     def plotData(self, rows):
         self.figure.clear()  # Clear the existing plot
+        self.figure.subplots_adjust(bottom=0.1)
         ax = self.figure.add_subplot(111)  # Add a subplot
 
         dates = [
@@ -297,6 +322,7 @@ class MainWindow(QMainWindow):
         avg_percentage_changes = [avg_changes.get(weekday, 0) for weekday in weekdays]
 
         self.figure.clear()
+        self.figure.subplots_adjust(bottom=0.3)
         ax = self.figure.add_subplot(111)
         ax.bar(weekdays, avg_percentage_changes, color="skyblue")
         ax.set_xlabel("Weekday")
