@@ -12,7 +12,8 @@ import csv
 from datetime import datetime
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
-
+import numpy as np
+from collections import defaultdict
 
 app = QApplication(sys.argv)
 
@@ -22,6 +23,15 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.initUI()
         self.currentPlot = None  # Track the current plot displayed
+
+    def parseDate(self, date_str):
+        date_formats = ["%Y-%m-%d %H:%M:%S", "%Y-%m-%d", "%Y/%m/%d"]
+        for fmt in date_formats:
+            try:
+                return datetime.strptime(date_str, fmt)
+            except ValueError:
+                continue
+        return None  # Return None if all parsing attempts fail
 
     def initUI(self):
         self.setWindowTitle("CSV Viewer")
@@ -84,29 +94,14 @@ class MainWindow(QMainWindow):
         self.figure.clear()  # Clear the existing plot
         ax = self.figure.add_subplot(111)  # Add a subplot
 
-        dates = [row["date"] for row in rows]
+        dates = [
+            self.parseDate(row["date"])
+            for row in rows
+            if self.parseDate(row["date"]) is not None
+        ]
         closes = [float(row.get("close", "0")) for row in rows]
 
-        # Define a list of date formats to try
-        date_formats = ["%Y-%m-%d %H:%M:%S", "%Y-%m-%d", "%Y/%m/%d"]
-        converted_dates = []
-        unrecognized_dates = False  # Flag to track unrecognized date formats
-
-        for date in dates:
-            date_converted = False
-            for fmt in date_formats:
-                try:
-                    converted_date = datetime.strptime(date, fmt).date()
-                    converted_dates.append(converted_date)
-                    date_converted = True
-                    break  # Break if the date was successfully parsed
-                except ValueError:
-                    continue  # Try the next format if there was a parsing error
-
-            if not date_converted:
-                unrecognized_dates = True  # Set the flag if no format matched
-
-        if unrecognized_dates:
+        if None in dates:
             # Log a warning if there were any unrecognized date formats
             QMessageBox.warning(
                 self,
@@ -114,11 +109,43 @@ class MainWindow(QMainWindow):
                 "Some dates were in an unrecognized format and were not plotted.",
             )
 
-        ax.plot(converted_dates, closes, marker="o", linestyle="-")  # Plot the data
+        ax.plot(dates, closes, marker="o", linestyle="-")  # Plot the data
         ax.set_xlabel("Date")
         ax.set_ylabel("Close")
         ax.grid(True)
         self.canvas.draw()
+
+    def calculateAvgPercentageChanges(self):
+        if not hasattr(self, "rows") or not self.rows:
+            QMessageBox.warning(
+                self, "Warning", "No data available to calculate average % changes."
+            )
+            return {}
+
+        changes = defaultdict(lambda: {"total": 0, "count": 0})
+        sorted_rows = sorted(self.rows, key=lambda x: self.parseDate(x["date"]))
+
+        for i in range(1, len(sorted_rows)):
+            prev_row = sorted_rows[i - 1]
+            current_row = sorted_rows[i]
+
+            prev_close = float(prev_row["close"])
+            current_close = float(current_row["close"])
+            percentage_change = ((current_close - prev_close) / prev_close) * 100
+
+            current_date = self.parseDate(current_row["date"])
+            if current_date is None:  # Skip rows with unrecognized date formats
+                continue
+            weekday = current_date.strftime("%A")
+
+            changes[weekday]["total"] += percentage_change
+            changes[weekday]["count"] += 1
+
+        avg_changes = {
+            weekday: data["total"] / data["count"] for weekday, data in changes.items()
+        }
+
+        return avg_changes
 
     def showGraph(self):
         # Check if the graph is already displayed
@@ -130,15 +157,36 @@ class MainWindow(QMainWindow):
         self.currentPlot = "graph"  # Update the current plot state
 
     def showAvgChanges(self):
-        # Check if the average % changes plot is already displayed
         if self.currentPlot == "avgChanges":
             return  # Do nothing if already shown
 
-        # Placeholder for average % changes plot logic
-        print(
-            "Average % Changes on Weekday plot functionality will be implemented here."
-        )
-        self.currentPlot = "avgChanges"  # Update the current plot state
+        avg_changes = self.calculateAvgPercentageChanges()
+
+        # Check if there's data to plot
+        if not avg_changes:
+            return
+
+        weekdays = [
+            "Monday",
+            "Tuesday",
+            "Wednesday",
+            "Thursday",
+            "Friday",
+            "Saturday",
+            "Sunday",
+        ]
+        avg_percentage_changes = [avg_changes.get(weekday, 0) for weekday in weekdays]
+
+        self.figure.clear()
+        ax = self.figure.add_subplot(111)
+        ax.bar(weekdays, avg_percentage_changes, color="skyblue")
+        ax.set_xlabel("Weekday")
+        ax.set_ylabel("Average % Change")
+        ax.set_title("Average % Change in Close Price by Weekday")
+        ax.set_xticklabels(weekdays, rotation=45, ha="right")
+
+        self.canvas.draw()
+        self.currentPlot = "avgChanges"
 
 
 if __name__ == "__main__":
