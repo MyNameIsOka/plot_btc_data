@@ -16,6 +16,7 @@ https://github.com/MyNameIsOka/plot_btc_data/assets/18796117/a76ecf27-7193-40db-
 
 - Python 3.8 or higher
 - Poetry for dependency management
+- CSV file with data of the BTC price with columns `date` and `close`
 
 ## Installation
 
