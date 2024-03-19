@@ -6,6 +6,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QMessageBox,
     QWidget,
+    QCalendarWidget,
 )
 import sys
 import csv
@@ -66,6 +67,42 @@ class MainWindow(QMainWindow):
         self.showAvgChangesButton.clicked.connect(self.showAvgChanges)
         layout.addWidget(self.showAvgChangesButton)
         self.showAvgChangesButton.hide()  # Initially hide this button
+
+        # Button to select the start date
+        self.startDateButton = QPushButton("Start Date", self)
+        self.startDateButton.clicked.connect(self.showStartDateCalendar)
+        layout.addWidget(self.startDateButton)
+        self.startDateButton.hide()  # Initially hidden
+
+        # Button to select the end date
+        self.endDateButton = QPushButton("End Date", self)
+        self.endDateButton.clicked.connect(self.showEndDateCalendar)
+        layout.addWidget(self.endDateButton)
+        self.endDateButton.hide()  # Initially hidden
+
+    def showStartDateCalendar(self):
+        # Initialize the calendar widget
+        self.startDateCalendar = QCalendarWidget()
+        self.startDateCalendar.setGridVisible(True)
+        self.startDateCalendar.clicked.connect(self.updateStartDate)
+        self.startDateCalendar.show()
+
+    def updateStartDate(self, date):
+        # Update the start date button label and hide the calendar
+        self.startDateButton.setText(date.toString("yyyy-MM-dd"))
+        self.startDateCalendar.hide()
+
+    def showEndDateCalendar(self):
+        # Initialize the calendar widget
+        self.endDateCalendar = QCalendarWidget()
+        self.endDateCalendar.setGridVisible(True)
+        self.endDateCalendar.clicked.connect(self.updateEndDate)
+        self.endDateCalendar.show()
+
+    def updateEndDate(self, date):
+        # Update the end date button label and hide the calendar
+        self.endDateButton.setText(date.toString("yyyy-MM-dd"))
+        self.endDateCalendar.hide()
 
     def openFileDialog(self):
         fileName, _ = QFileDialog.getOpenFileName(
@@ -187,6 +224,10 @@ class MainWindow(QMainWindow):
 
         self.canvas.draw()
         self.currentPlot = "avgChanges"
+
+        # Show the date selection buttons
+        self.startDateButton.show()
+        self.endDateButton.show()
 
 
 if __name__ == "__main__":
