@@ -131,39 +131,33 @@ class MainWindow(QMainWindow):
         self.endDateEdit.hide()
 
     def toggleDateSelectors(self, show_next_to=None):
-        # Hide all date selection widgets initially
+        # Hide the date selectors initially
         self.startLabel.setVisible(False)
         self.startDateEdit.setVisible(False)
         self.endLabel.setVisible(False)
         self.endDateEdit.setVisible(False)
 
-        # Based on the button clicked, show the date selectors next to the appropriate button
+        # Decide where to show the date selectors based on the current plot
         if show_next_to == "avgChanges":
-            # Display the date selectors for the "Show Average % Changes on Weekday" button
-            self.startLabel.setVisible(True)
-            self.startDateEdit.setVisible(True)
-            self.endLabel.setVisible(True)
-            self.endDateEdit.setVisible(True)
-
-            # Ensure the layout for date selectors is properly managed
             self.avgChangesLayout.addWidget(self.startLabel)
             self.avgChangesLayout.addWidget(self.startDateEdit)
             self.avgChangesLayout.addWidget(self.endLabel)
             self.avgChangesLayout.addWidget(self.endDateEdit)
-
-        elif show_next_to == "heatmap":
-            # Display the date selectors for the "Show heatmap per day" button
+            # Make visible
             self.startLabel.setVisible(True)
             self.startDateEdit.setVisible(True)
             self.endLabel.setVisible(True)
             self.endDateEdit.setVisible(True)
-
-            # Move date selection widgets to the heatmap layout
-            # Note: If moving widgets causes issues, consider creating separate widgets for each layout or managing visibility without moving.
+        elif show_next_to == "heatmap":
             self.heatmapLayout.addWidget(self.startLabel)
             self.heatmapLayout.addWidget(self.startDateEdit)
             self.heatmapLayout.addWidget(self.endLabel)
             self.heatmapLayout.addWidget(self.endDateEdit)
+            # Make visible
+            self.startLabel.setVisible(True)
+            self.startDateEdit.setVisible(True)
+            self.endLabel.setVisible(True)
+            self.endDateEdit.setVisible(True)
 
     def showStartDateCalendar(self, event):
         if not hasattr(self, "startDateCalendar"):
@@ -186,8 +180,11 @@ class MainWindow(QMainWindow):
             self.endDateEdit.setText(selectedDate.strftime("%Y-%m-%d"))
 
         self.startDateCalendar.close()
+
         if self.currentPlot == "avgChanges":
             self.showAvgChanges()
+        elif self.currentPlot == "heatmap":
+            self.showHeatmap()
 
     def showEndDateCalendar(self, event):
         if not hasattr(self, "endDateCalendar"):
@@ -215,6 +212,8 @@ class MainWindow(QMainWindow):
         self.endDateCalendar.close()
         if self.currentPlot == "avgChanges":
             self.showAvgChanges()
+        elif self.currentPlot == "heatmap":
+            self.showHeatmap()
 
     def openFileDialog(self):
         fileName, _ = QFileDialog.getOpenFileName(
@@ -408,17 +407,26 @@ class MainWindow(QMainWindow):
 
         self.toggleDateSelectors("avgChanges")
 
-    def processDataForHeatmap(self, start_date, end_date):
+    def processDataForHeatmap(self, start_date_str, end_date_str):
+        # Convert string dates to datetime objects
+        start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+        end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+
         sorted_rows = sorted(self.rows, key=lambda x: self.parseDate(x["date"]))
         daily_changes = defaultdict(lambda: {"sum": 0, "count": 0})
-        for i in range(1, len(sorted_rows)):
-            prev_close = float(sorted_rows[i - 1]["close"])
-            curr_close = float(sorted_rows[i]["close"])
-            date = self.parseDate(sorted_rows[i]["date"]).date()
-            if prev_close != 0:  # Avoid division by zero
-                percentage_change = ((curr_close - prev_close) / prev_close) * 100
-                daily_changes[date.day]["sum"] += percentage_change
-                daily_changes[date.day]["count"] += 1
+        # Filter rows based on the selected date range
+        for row in sorted_rows:
+            date = self.parseDate(row["date"]).date()
+            if date < start_date or date > end_date:
+                continue  # Skip dates outside the selected range
+
+            if len(sorted_rows) > 1:
+                prev_close = float(sorted_rows[sorted_rows.index(row) - 1]["close"])
+                curr_close = float(row["close"])
+                if prev_close != 0:  # Avoid division by zero
+                    percentage_change = ((curr_close - prev_close) / prev_close) * 100
+                    daily_changes[date.day]["sum"] += percentage_change
+                    daily_changes[date.day]["count"] += 1
 
         average_daily_changes = {
             day: changes["sum"] / changes["count"]
@@ -429,6 +437,8 @@ class MainWindow(QMainWindow):
         # Initialize the matrix to accommodate 31 days across 5 rows and 7 columns
         heatmap_data = np.zeros((5, 7))
         for day, avg_change in average_daily_changes.items():
+            if day > 31:
+                continue
             row = (day - 1) // 7
             col = (day - 1) % 7
             heatmap_data[row, col] = avg_change
@@ -445,29 +455,21 @@ class MainWindow(QMainWindow):
 
         # Clear the current figure
         self.figure.clear()
+        self.figure.subplots_adjust(bottom=0.1)
         ax = self.figure.add_subplot(111)
-
-        # Create the heatmap
         cax = ax.matshow(heatmap_data, cmap="RdBu")
+        self.figure.colorbar(cax)
 
-        # Add a colorbar
-        cbar = self.figure.colorbar(cax)
-        cbar.set_label("Average % Change")
-
-        # Adjust x-axis and y-axis labels to be empty since we're putting labels in tiles
-        ax.set_xticks([])
-        ax.set_yticks([])
-
-        # Annotate each cell with day and percentage change
+        # Annotate each cell
         for i in range(heatmap_data.shape[0]):
             for j in range(heatmap_data.shape[1]):
-                day = i * 7 + j + 1
-                if day > 31:  # Skip if beyond day 31
-                    continue
                 value = heatmap_data[i, j]
-                if value != 0:  # Assuming 0 for missing data, adjust as needed
-                    text = f"Day {day}\n{value:.1f}%"
-                    ax.text(j, i, text, ha="center", va="center", color="white")
+                # Determine text color based on cell's value for better contrast
+                text_color = (
+                    "white" if abs(value) > 25 else "black"
+                )  # Adjust the threshold as needed
+                text = f"Day {i*7+j+1}\n{value:.1f}%"
+                ax.text(j, i, text, ha="center", va="center", color=text_color)
 
         self.canvas.draw()
 
@@ -477,6 +479,7 @@ class MainWindow(QMainWindow):
         self.endLabel.show()
         self.endDateEdit.show()
         self.currentPlot = "heatmap"
+        self.toggleDateSelectors("heatmap")
 
 
 if __name__ == "__main__":
