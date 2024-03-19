@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QWidget,
     QCalendarWidget,
+    QHBoxLayout,
 )
 import sys
 import csv
@@ -42,43 +43,57 @@ class MainWindow(QMainWindow):
         # Central Widget and Layout
         centralWidget = QWidget(self)
         self.setCentralWidget(centralWidget)
-        layout = QVBoxLayout(centralWidget)
-
-        # Button to open CSV file
-        self.openCsvButton = QPushButton("Open CSV File", self)
-        self.openCsvButton.clicked.connect(self.openFileDialog)
-        layout.addWidget(self.openCsvButton)
+        mainLayout = QVBoxLayout(centralWidget)
 
         # Matplotlib Figure
         self.figure = Figure()
         self.canvas = FigureCanvas(self.figure)
-        layout.addWidget(self.canvas)
+        mainLayout.addWidget(self.canvas)
+        # ---------------------------------------------------------------------
+        # Horizontal layout for buttons
+        buttonsLayout = QHBoxLayout()
+
+        # Button to open CSV file
+        self.openCsvButton = QPushButton("Open CSV File", self)
+        self.openCsvButton.clicked.connect(self.openFileDialog)
+        mainLayout.addWidget(self.openCsvButton)
 
         # Button to show the initial graph
         self.showGraphButton = QPushButton("Show Graph", self)
         self.showGraphButton.clicked.connect(self.showGraph)
-        layout.addWidget(self.showGraphButton)
+        mainLayout.addWidget(self.showGraphButton)
         self.showGraphButton.hide()  # Initially hide this button
 
         # Button to show the average % changes on weekday
+        # Show Average % Changes on Weekday Button
         self.showAvgChangesButton = QPushButton(
             "Show Average % Changes on Weekday", self
         )
         self.showAvgChangesButton.clicked.connect(self.showAvgChanges)
-        layout.addWidget(self.showAvgChangesButton)
+        buttonsLayout.addWidget(
+            self.showAvgChangesButton, 50
+        )  # Adding to horizontal layout with stretch factor
         self.showAvgChangesButton.hide()  # Initially hide this button
 
-        # Button to select the start date
+        # Start Date Button
         self.startDateButton = QPushButton("Start Date", self)
         self.startDateButton.clicked.connect(self.showStartDateCalendar)
-        layout.addWidget(self.startDateButton)
         self.startDateButton.hide()  # Initially hidden
+        buttonsLayout.addWidget(
+            self.startDateButton, 25
+        )  # Adding to horizontal layout with stretch factor
 
-        # Button to select the end date
+        # End Date Button
         self.endDateButton = QPushButton("End Date", self)
         self.endDateButton.clicked.connect(self.showEndDateCalendar)
-        layout.addWidget(self.endDateButton)
         self.endDateButton.hide()  # Initially hidden
+        buttonsLayout.addWidget(
+            self.endDateButton, 25
+        )  # Adding to horizontal layout with stretch factor
+
+        mainLayout.addLayout(
+            buttonsLayout
+        )  # Add the horizontal layout to the main layout
 
     def showStartDateCalendar(self):
         # Initialize the calendar widget
@@ -126,6 +141,11 @@ class MainWindow(QMainWindow):
             )
             self.showGraphButton.show()
             self.showAvgChangesButton.show()
+            self.startDateButton.hide()
+            self.endDateButton.hide()
+
+            # Reset current plot state
+            self.currentPlot = None
 
     def plotData(self, rows):
         self.figure.clear()  # Clear the existing plot
@@ -192,6 +212,10 @@ class MainWindow(QMainWindow):
         # Assuming self.rows stores the CSV data
         self.plotData(self.rows)
         self.currentPlot = "graph"  # Update the current plot state
+
+        # Hide the date selection buttons
+        self.startDateButton.hide()
+        self.endDateButton.hide()
 
     def showAvgChanges(self):
         if self.currentPlot == "avgChanges":
