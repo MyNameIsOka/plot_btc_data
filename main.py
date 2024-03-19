@@ -53,76 +53,93 @@ class MainWindow(QMainWindow):
         self.canvas = FigureCanvas(self.figure)
         mainLayout.addWidget(self.canvas, 1)
 
-        # Horizontal layout for buttons
-        self.buttonsLayout = QHBoxLayout()
-        mainLayout.addLayout(self.buttonsLayout)
-
         # Button to open CSV file
         self.openCsvButton = QPushButton("Open CSV File", self)
         self.openCsvButton.clicked.connect(self.openFileDialog)
-        self.buttonsLayout.addWidget(self.openCsvButton)
+        mainLayout.addWidget(self.openCsvButton)
 
         # Button to show the initial graph
         self.showGraphButton = QPushButton("Show Graph", self)
         self.showGraphButton.clicked.connect(self.showGraph)
         mainLayout.addWidget(self.showGraphButton)
-        self.showGraphButton.hide()  # Initially hide this button
+        self.showGraphButton.hide()
 
-        # Button to show the average % changes on weekday
-        # Show Average % Changes on Weekday Button
+        # Create a layout for "Show Average % Changes on Weekday" button and its date selectors
+        self.avgChangesLayout = QHBoxLayout()
         self.showAvgChangesButton = QPushButton(
             "Show Average % Changes on Weekday", self
         )
         self.showAvgChangesButton.clicked.connect(self.showAvgChanges)
-        self.buttonsLayout.addWidget(self.showAvgChangesButton, 50)
-        self.showAvgChangesButton.hide()  # Initially hide this button
+        self.avgChangesLayout.addWidget(self.showAvgChangesButton)
 
-        # Button to show the heatmap per day
+        # Create a layout for "Show heatmap per day" button and its date selectors
+        self.heatmapLayout = QHBoxLayout()
         self.showHeatmapButton = QPushButton("Show heatmap per day", self)
         self.showHeatmapButton.clicked.connect(self.showHeatmap)
-        self.buttonsLayout.addWidget(self.showHeatmapButton)
-        self.showHeatmapButton.hide()  # Initially hide this button
+        self.heatmapLayout.addWidget(self.showHeatmapButton)
 
-        # Shared Layout for date selection, not added to the main layout initially
+        # Shared Layout for date selection
         self.dateSelectionLayout = QHBoxLayout()
 
         # Start and End Date Label and Text Field
         self.startLabel = QLabel("Start:", self)
-        self.dateSelectionLayout.addWidget(self.startLabel)
         self.startDateEdit = QLineEdit(self)
         self.startDateEdit.setReadOnly(True)
         self.startDateEdit.mousePressEvent = self.showStartDateCalendar
-        self.dateSelectionLayout.addWidget(self.startDateEdit)
 
         self.endLabel = QLabel("End:", self)
-        self.dateSelectionLayout.addWidget(self.endLabel)
         self.endDateEdit = QLineEdit(self)
         self.endDateEdit.setReadOnly(True)
         self.endDateEdit.mousePressEvent = self.showEndDateCalendar
+
+        # Add the start and end date widgets to the date selection layout
+        self.dateSelectionLayout.addWidget(self.startLabel)
+        self.dateSelectionLayout.addWidget(self.startDateEdit)
+        self.dateSelectionLayout.addWidget(self.endLabel)
         self.dateSelectionLayout.addWidget(self.endDateEdit)
 
-        # Initially hide the date selection UI elements
-        self.toggleDateSelectors()  # Call with no arguments to hide
+        # Add the date selection layout to the avgChanges and heatmap layouts
+        self.avgChangesLayout.addLayout(self.dateSelectionLayout)
+        self.heatmapLayout.addLayout(self.dateSelectionLayout)
+
+        # Add the avgChanges and heatmap layouts to the main layout
+        mainLayout.addLayout(self.avgChangesLayout)
+        mainLayout.addLayout(self.heatmapLayout)
+
+        # Initially hide the date selection UI elements and the heatmap button
+        self.showAvgChangesButton.hide()
+        self.showHeatmapButton.hide()
+        self.startLabel.hide()
+        self.startDateEdit.hide()
+        self.endLabel.hide()
+        self.endDateEdit.hide()
 
     def toggleDateSelectors(self, show_next_to=None):
-        # Remove the date selection layout from its current parent
-        if self.dateSelectionLayout.parent():
-            self.dateSelectionLayout.parent().removeItem(self.dateSelectionLayout)
+        # Hide the date selection widgets first
+        self.startLabel.setVisible(False)
+        self.startDateEdit.setVisible(False)
+        self.endLabel.setVisible(False)
+        self.endDateEdit.setVisible(False)
 
-        # Depending on the button clicked, add the date selectors next to the appropriate button
+        # Then, based on the button clicked, show the date selectors next to the appropriate button
         if show_next_to == "avgChanges":
-            # Insert date selection layout next to the "Show Average % Changes on Weekday" button
-            self.buttonsLayout.insertLayout(2, self.dateSelectionLayout)
+            self.avgChangesLayout.addWidget(self.startLabel)
+            self.avgChangesLayout.addWidget(self.startDateEdit)
+            self.avgChangesLayout.addWidget(self.endLabel)
+            self.avgChangesLayout.addWidget(self.endDateEdit)
+            self.startLabel.setVisible(True)
+            self.startDateEdit.setVisible(True)
+            self.endLabel.setVisible(True)
+            self.endDateEdit.setVisible(True)
         elif show_next_to == "heatmap":
-            # Insert date selection layout next to the "Show heatmap per day" button
-            self.buttonsLayout.insertLayout(3, self.dateSelectionLayout)
-
-        # Show or hide the date selection widgets
-        show = show_next_to is not None
-        self.startLabel.setVisible(show)
-        self.startDateEdit.setVisible(show)
-        self.endLabel.setVisible(show)
-        self.endDateEdit.setVisible(show)
+            self.heatmapLayout.addWidget(self.startLabel)
+            self.heatmapLayout.addWidget(self.startDateEdit)
+            self.heatmapLayout.addWidget(self.endLabel)
+            self.heatmapLayout.addWidget(self.endDateEdit)
+            self.startLabel.setVisible(True)
+            self.startDateEdit.setVisible(True)
+            self.endLabel.setVisible(True)
+            self.endDateEdit.setVisible(True)
 
     def showStartDateCalendar(self, event):
         if not hasattr(self, "startDateCalendar"):
