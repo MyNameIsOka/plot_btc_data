@@ -21,6 +21,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.initUI()
+        self.currentPlot = None  # Track the current plot displayed
 
     def initUI(self):
         self.setWindowTitle("CSV Viewer")
@@ -72,6 +73,10 @@ class MainWindow(QMainWindow):
             self.plotData(self.rows)
 
             # Show the buttons after data is loaded
+            self.plotData(self.rows)
+            self.currentPlot = (
+                "graph"  # Assume graph is the default plot shown after loading data
+            )
             self.showGraphButton.show()
             self.showAvgChangesButton.show()
 
@@ -116,15 +121,24 @@ class MainWindow(QMainWindow):
         self.canvas.draw()
 
     def showGraph(self):
+        # Check if the graph is already displayed
+        if self.currentPlot == "graph":
+            return  # Do nothing if the graph is already shown
+
         # Assuming self.rows stores the CSV data
         self.plotData(self.rows)
+        self.currentPlot = "graph"  # Update the current plot state
 
     def showAvgChanges(self):
-        # Placeholder for now
-        # Logic to calculate and show the average % changes plot will go here
+        # Check if the average % changes plot is already displayed
+        if self.currentPlot == "avgChanges":
+            return  # Do nothing if already shown
+
+        # Placeholder for average % changes plot logic
         print(
             "Average % Changes on Weekday plot functionality will be implemented here."
         )
+        self.currentPlot = "avgChanges"  # Update the current plot state
 
 
 if __name__ == "__main__":
