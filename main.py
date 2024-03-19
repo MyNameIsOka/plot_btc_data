@@ -426,66 +426,49 @@ class MainWindow(QMainWindow):
             if changes["count"] > 0
         }
 
-        # Initialize the matrix with zeros or another placeholder for days without data
-        heatmap_data = np.zeros((6, 5))  # 6 rows for weeks, 5 columns for weekdays
+        # Initialize the matrix to accommodate 31 days across 5 rows and 7 columns
+        heatmap_data = np.zeros((5, 7))
         for day, avg_change in average_daily_changes.items():
-            if day == 31:  # Handle the 31st day as a special case
-                row, col = 5, 0
-            else:
-                row = (day - 1) // 5
-                col = (day - 1) % 5
+            row = (day - 1) // 7
+            col = (day - 1) % 7
             heatmap_data[row, col] = avg_change
 
-        # Handle the 31st day separately if present
-        if 31 in average_daily_changes:
-            heatmap_data[5, 0] = average_daily_changes[31]
-
-        min_change = min(heatmap_data.flatten())
-        max_change = max(heatmap_data.flatten())
+        min_change = min(heatmap_data.flatten(), default=0)
+        max_change = max(heatmap_data.flatten(), default=0)
 
         return heatmap_data, min_change, max_change
 
     def showHeatmap(self):
-        # Call the function to process data and get heatmap_data, min_change, max_change
         heatmap_data, _, _ = self.processDataForHeatmap(
             self.startDateEdit.text(), self.endDateEdit.text()
-        )
-
-        # Normalize the data for color mapping
-        min_change = np.min(heatmap_data)
-        max_change = np.max(heatmap_data)
-        norm = Normalize(
-            vmin=min(min_change, -max_change), vmax=max(max_change, -min_change)
         )
 
         # Clear the current figure
         self.figure.clear()
         ax = self.figure.add_subplot(111)
 
-        # Create the heatmap using imshow
-        cax = ax.imshow(heatmap_data, cmap="RdBu", norm=norm, aspect="equal")
+        # Create the heatmap
+        cax = ax.matshow(heatmap_data, cmap="RdBu")
 
         # Add a colorbar
-        cbar = self.figure.colorbar(cax, ax=ax)
+        cbar = self.figure.colorbar(cax)
         cbar.set_label("Average % Change")
 
-        # Set the tick labels for days and weeks
-        ax.set_xticks(range(5))
-        ax.set_yticks(range(6))
-        ax.set_xticklabels(["Mon", "Tue", "Wed", "Thu", "Fri"], minor=False)
-        ax.set_yticklabels(
-            ["Week 1", "Week 2", "Week 3", "Week 4", "Week 5", "Day 31"], minor=False
-        )
+        # Adjust x-axis and y-axis labels to be empty since we're putting labels in tiles
+        ax.set_xticks([])
+        ax.set_yticks([])
 
-        # Optionally, add annotations to each cell
+        # Annotate each cell with day and percentage change
         for i in range(heatmap_data.shape[0]):
             for j in range(heatmap_data.shape[1]):
+                day = i * 7 + j + 1
+                if day > 31:  # Skip if beyond day 31
+                    continue
                 value = heatmap_data[i, j]
-                if not np.isclose(value, 0):  # Skip zero or close-to-zero values
-                    ax.text(j, i, f"{value:.2f}%", ha="center", va="center", color="w")
+                if value != 0:  # Assuming 0 for missing data, adjust as needed
+                    text = f"Day {day}\n{value:.1f}%"
+                    ax.text(j, i, text, ha="center", va="center", color="white")
 
-        # Set the title and show the plot
-        ax.set_title("Heatmap of Average % Changes per Day")
         self.canvas.draw()
 
         # Update UI elements for the heatmap
@@ -493,9 +476,6 @@ class MainWindow(QMainWindow):
         self.startDateEdit.show()
         self.endLabel.show()
         self.endDateEdit.show()
-
-        # Hide or show UI elements as needed
-        self.toggleDateSelectors("heatmap")
         self.currentPlot = "heatmap"
 
 
