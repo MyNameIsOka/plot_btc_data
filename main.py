@@ -124,18 +124,18 @@ class MainWindow(QMainWindow):
         self.startDateCalendar.show()
 
     def updateStartDate(self, date):
-        selectedDate = date.toPython()  # Convert QDate to python datetime.date
-        endDate = datetime.strptime(self.endDateEdit.text(), "%Y-%m-%d").date()
-
-        # Ensure the selected start date is not after the end date
-        if selectedDate > endDate:
-            endDate = selectedDate
-            self.endDateEdit.setText(endDate.strftime("%Y-%m-%d"))
+        selectedDate = date.toPython()
+        # Ensure the selected start date is within the dataset's date range
+        if selectedDate < self.oldestDate:
+            selectedDate = self.oldestDate
+        elif selectedDate > self.mostRecentDate:
+            selectedDate = self.mostRecentDate
 
         self.startDateEdit.setText(selectedDate.strftime("%Y-%m-%d"))
-        self.startDateCalendar.close()
+        if selectedDate > datetime.strptime(self.endDateEdit.text(), "%Y-%m-%d").date():
+            self.endDateEdit.setText(selectedDate.strftime("%Y-%m-%d"))
 
-        # Trigger re-plot if appropriate
+        self.startDateCalendar.close()
         if self.currentPlot == "avgChanges":
             self.showAvgChanges()
 
@@ -148,18 +148,21 @@ class MainWindow(QMainWindow):
         self.endDateCalendar.show()
 
     def updateEndDate(self, date):
-        selectedDate = date.toPython()  # Convert QDate to python datetime.date
-        startDate = datetime.strptime(self.startDateEdit.text(), "%Y-%m-%d").date()
-
-        # Ensure the selected end date is not before the start date
-        if selectedDate < startDate:
-            startDate = selectedDate
-            self.startDateEdit.setText(startDate.strftime("%Y-%m-%d"))
+        selectedDate = date.toPython()
+        # Ensure the selected end date is within the dataset's date range
+        if selectedDate > self.mostRecentDate:
+            selectedDate = self.mostRecentDate
+        elif selectedDate < self.oldestDate:
+            selectedDate = self.oldestDate
 
         self.endDateEdit.setText(selectedDate.strftime("%Y-%m-%d"))
-        self.endDateCalendar.close()
+        if (
+            selectedDate
+            < datetime.strptime(self.startDateEdit.text(), "%Y-%m-%d").date()
+        ):
+            self.startDateEdit.setText(selectedDate.strftime("%Y-%m-%d"))
 
-        # Trigger re-plot if appropriate
+        self.endDateCalendar.close()
         if self.currentPlot == "avgChanges":
             self.showAvgChanges()
 
@@ -171,26 +174,40 @@ class MainWindow(QMainWindow):
             self.loadData(fileName)
 
     def initializeDateRange(self):
-        dates = [
-            self.parseDate(row["date"])
-            for row in self.rows
-            if self.parseDate(row["date"])
-        ]
-        if dates:
-            minDate = min(dates)
-            maxDate = max(dates)
-            self.startDateEdit.setText(minDate.strftime("%Y-%m-%d"))
-            self.endDateEdit.setText(maxDate.strftime("%Y-%m-%d"))
+        if self.rows:
+            dates = [
+                self.parseDate(row["date"]).date()
+                for row in self.rows
+                if self.parseDate(row["date"])
+            ]
+            self.oldestDate = min(dates)
+            self.mostRecentDate = max(dates)
 
-        # Convert datetime.date to QDate
-        qMinDate = QDate(minDate.year, minDate.month, minDate.day)
-        qMaxDate = QDate(maxDate.year, maxDate.month, maxDate.day)
+            # Update QLineEdit widgets to show the initial date range
+            self.startDateEdit.setText(self.oldestDate.strftime("%Y-%m-%d"))
+            self.endDateEdit.setText(self.mostRecentDate.strftime("%Y-%m-%d"))
 
-        # Assuming the calendar widgets are initialized here or elsewhere before this method is called
-        self.startDateCalendar.setMinimumDate(qMinDate)
-        self.startDateCalendar.setMaximumDate(qMaxDate)
-        self.endDateCalendar.setMinimumDate(qMinDate)
-        self.endDateCalendar.setMaximumDate(qMaxDate)
+            # Update calendar widgets to set their minimum and maximum selectable dates
+            self.startDateCalendar.setMinimumDate(
+                QDate(self.oldestDate.year, self.oldestDate.month, self.oldestDate.day)
+            )
+            self.startDateCalendar.setMaximumDate(
+                QDate(
+                    self.mostRecentDate.year,
+                    self.mostRecentDate.month,
+                    self.mostRecentDate.day,
+                )
+            )
+            self.endDateCalendar.setMinimumDate(
+                QDate(self.oldestDate.year, self.oldestDate.month, self.oldestDate.day)
+            )
+            self.endDateCalendar.setMaximumDate(
+                QDate(
+                    self.mostRecentDate.year,
+                    self.mostRecentDate.month,
+                    self.mostRecentDate.day,
+                )
+            )
 
     def loadData(self, filePath):
         with open(filePath, "r", newline="", encoding="utf-8") as csvfile:
