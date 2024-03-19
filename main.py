@@ -8,7 +8,10 @@ from PySide6.QtWidgets import (
     QWidget,
     QCalendarWidget,
     QHBoxLayout,
+    QLabel,
+    QLineEdit,
 )
+from PySide6.QtCore import Qt
 import sys
 import csv
 from datetime import datetime
@@ -49,7 +52,6 @@ class MainWindow(QMainWindow):
         self.figure = Figure()
         self.canvas = FigureCanvas(self.figure)
         mainLayout.addWidget(self.canvas)
-        # ---------------------------------------------------------------------
         # Horizontal layout for buttons
         buttonsLayout = QHBoxLayout()
 
@@ -75,49 +77,66 @@ class MainWindow(QMainWindow):
         )  # Adding to horizontal layout with stretch factor
         self.showAvgChangesButton.hide()  # Initially hide this button
 
-        # Start Date Button
-        self.startDateButton = QPushButton("Start Date", self)
-        self.startDateButton.clicked.connect(self.showStartDateCalendar)
-        self.startDateButton.hide()  # Initially hidden
-        buttonsLayout.addWidget(
-            self.startDateButton, 25
-        )  # Adding to horizontal layout with stretch factor
+        # Layout for date selection
+        dateSelectionLayout = QHBoxLayout()
 
-        # End Date Button
-        self.endDateButton = QPushButton("End Date", self)
-        self.endDateButton.clicked.connect(self.showEndDateCalendar)
-        self.endDateButton.hide()  # Initially hidden
-        buttonsLayout.addWidget(
-            self.endDateButton, 25
-        )  # Adding to horizontal layout with stretch factor
+        # Start Date Label and Text Field
+        self.startLabel = QLabel("Start:", self)
+        dateSelectionLayout.addWidget(self.startLabel)
+
+        self.startDateEdit = QLineEdit(self)
+        self.startDateEdit.setReadOnly(True)  # Make it read-only
+        self.startDateEdit.mousePressEvent = (
+            self.showStartDateCalendar
+        )  # Open calendar on click
+        dateSelectionLayout.addWidget(self.startDateEdit)
+
+        # End Date Label and Text Field
+        self.endLabel = QLabel("End:", self)
+        dateSelectionLayout.addWidget(self.endLabel)
+
+        self.endDateEdit = QLineEdit(self)
+        self.endDateEdit.setReadOnly(True)  # Make it read-only
+        self.endDateEdit.mousePressEvent = (
+            self.showEndDateCalendar
+        )  # Open calendar on click
+        dateSelectionLayout.addWidget(self.endDateEdit)
+
+        # Initially hide the date selection UI elements
+        self.startLabel.hide()
+        self.startDateEdit.hide()
+        self.endLabel.hide()
+        self.endDateEdit.hide()
+
+        # Adding date selection layout to the main buttons layout
+        buttonsLayout.addLayout(dateSelectionLayout)
 
         mainLayout.addLayout(
             buttonsLayout
         )  # Add the horizontal layout to the main layout
 
-    def showStartDateCalendar(self):
-        # Initialize the calendar widget
+    def showStartDateCalendar(self, event):
         self.startDateCalendar = QCalendarWidget()
         self.startDateCalendar.setGridVisible(True)
-        self.startDateCalendar.clicked.connect(self.updateStartDate)
+        self.startDateCalendar.selectedDate().connect(self.updateStartDate)
+        self.startDateCalendar.setWindowModality(Qt.ApplicationModal)
         self.startDateCalendar.show()
 
     def updateStartDate(self, date):
-        # Update the start date button label and hide the calendar
-        self.startDateButton.setText(date.toString("yyyy-MM-dd"))
-        self.startDateCalendar.hide()
+        self.startDateEdit.setText(date.toString("yyyy-MM-dd"))
+        self.startDateCalendar.close()
 
     def showEndDateCalendar(self):
         # Initialize the calendar widget
         self.endDateCalendar = QCalendarWidget()
         self.endDateCalendar.setGridVisible(True)
-        self.endDateCalendar.clicked.connect(self.updateEndDate)
+        self.endDateCalendar.selectedDate().connect(self.updateEndDate)
+        self.endDateCalendar.setWindowModality(Qt.ApplicationModal)
         self.endDateCalendar.show()
 
     def updateEndDate(self, date):
-        # Update the end date button label and hide the calendar
-        self.endDateButton.setText(date.toString("yyyy-MM-dd"))
-        self.endDateCalendar.hide()
+        self.endDateEdit.setText(date.toString("yyyy-MM-dd"))
+        self.endDateCalendar.close()
 
     def openFileDialog(self):
         fileName, _ = QFileDialog.getOpenFileName(
@@ -125,6 +144,20 @@ class MainWindow(QMainWindow):
         )
         if fileName:
             self.loadData(fileName)
+
+    def initializeDateRange(self):
+        # Example: Assuming self.rows is a list of dictionaries with 'date' keys
+        dates = [
+            self.parseDate(row["date"])
+            for row in self.rows
+            if self.parseDate(row["date"])
+        ]
+        if dates:
+            self.startDateEdit.setText(min(dates).strftime("%Y-%m-%d"))
+            self.endDateEdit.setText(max(dates).strftime("%Y-%m-%d"))
+        else:
+            self.startDateEdit.clear()
+            self.endDateEdit.clear()
 
     def loadData(self, filePath):
         with open(filePath, "r", newline="", encoding="utf-8") as csvfile:
@@ -141,11 +174,16 @@ class MainWindow(QMainWindow):
             )
             self.showGraphButton.show()
             self.showAvgChangesButton.show()
-            self.startDateButton.hide()
-            self.endDateButton.hide()
+            self.startLabel.hide()
+            self.startDateEdit.hide()
+            self.endLabel.hide()
+            self.endDateEdit.hide()
 
             # Reset current plot state
             self.currentPlot = None
+
+            # Initialize the date range
+            self.initializeDateRange()
 
     def plotData(self, rows):
         self.figure.clear()  # Clear the existing plot
@@ -214,8 +252,10 @@ class MainWindow(QMainWindow):
         self.currentPlot = "graph"  # Update the current plot state
 
         # Hide the date selection buttons
-        self.startDateButton.hide()
-        self.endDateButton.hide()
+        self.startLabel.hide()
+        self.startDateEdit.hide()
+        self.endLabel.hide()
+        self.endDateEdit.hide()
 
     def showAvgChanges(self):
         if self.currentPlot == "avgChanges":
@@ -250,8 +290,10 @@ class MainWindow(QMainWindow):
         self.currentPlot = "avgChanges"
 
         # Show the date selection buttons
-        self.startDateButton.show()
-        self.endDateButton.show()
+        self.startLabel.show()
+        self.startDateEdit.show()
+        self.endLabel.show()
+        self.endDateEdit.show()
 
 
 if __name__ == "__main__":
