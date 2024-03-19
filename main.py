@@ -131,7 +131,7 @@ class MainWindow(QMainWindow):
             self.showAvgChanges()
         self.startDateCalendar.close()
 
-    def showEndDateCalendar(self):
+    def showEndDateCalendar(self, event):
         if not hasattr(self, "endDateCalendar"):
             self.endDateCalendar = QCalendarWidget()
             self.endDateCalendar.setGridVisible(True)
