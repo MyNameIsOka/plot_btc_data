@@ -468,6 +468,8 @@ class MainWindow(QMainWindow):
                 text_color = (
                     "white" if abs(value) > 25 else "black"
                 )  # Adjust the threshold as needed
+                if i * 7 + j + 1 > 31:
+                    continue
                 text = f"Day {i*7+j+1}\n{value:.1f}%"
                 ax.text(j, i, text, ha="center", va="center", color=text_color)
 
