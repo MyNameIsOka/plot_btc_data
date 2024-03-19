@@ -10,6 +10,8 @@ This project is a comprehensive tool for visualizing and analyzing BTC data in C
 - **Editable Date Range for Analysis**: Users can specify the date range for the analysis to focus on particular periods.
 - **Heatmap Visualization**: Offers a heatmap view to analyze the average percentage change per day throughout the selected date range, with color coding indicating positive (green) and negative (red) changes.
 
+https://github.com/MyNameIsOka/plot_btc_data/assets/18796117/a76ecf27-7193-40db-a97f-b260bad8a82d
+
 ## Prerequisites
 
 - Python 3.8 or higher
