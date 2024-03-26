@@ -318,6 +318,15 @@ class MainWindow(QMainWindow):
                 )
             )
 
+    def validate_date_range(self):
+        start_date_str = self.start_date_edit.text()
+        end_date_str = self.end_date_edit.text()
+
+        if not start_date_str or not end_date_str:
+            QMessageBox.warning(self, "Warning", "Please select a valid date range.")
+            return False
+        return True
+
     def plot_data(self, rows):
         # Keep the plot_data method here
         self.figure.clear()  # Clear the existing plot
@@ -345,64 +354,69 @@ class MainWindow(QMainWindow):
         ax.grid(True)
         self.canvas.draw()
 
+    def show_calendar(self, is_start_date):
+        if is_start_date:
+            if not hasattr(self, "start_date_calendar"):
+                self.start_date_calendar = QCalendarWidget()
+                self.start_date_calendar.setGridVisible(True)
+                self.start_date_calendar.clicked.connect(self.update_start_date)
+                self.start_date_calendar.setWindowModality(Qt.ApplicationModal)
+            self.start_date_calendar.show()
+        else:
+            if not hasattr(self, "end_date_calendar"):
+                self.end_date_calendar = QCalendarWidget()
+                self.end_date_calendar.setGridVisible(True)
+                self.end_date_calendar.clicked.connect(self.update_end_date)
+                self.end_date_calendar.setWindowModality(Qt.ApplicationModal)
+            self.end_date_calendar.show()
+
     def show_start_date_calendar(self, event):
-        if not hasattr(self, "start_date_calendar"):
-            self.start_date_calendar = QCalendarWidget()
-            self.start_date_calendar.setGridVisible(True)
-            self.start_date_calendar.clicked.connect(self.update_start_date)
-            self.start_date_calendar.setWindowModality(Qt.ApplicationModal)
-        self.start_date_calendar.show()
-
-    def update_start_date(self, date):
-        selected_date = date.toPython()
-        # Ensure the selected start date is within the dataset's date range
-        if selected_date < self.oldest_date:
-            selected_date = self.oldest_date
-        elif selected_date > self.most_recent_date:
-            selected_date = self.most_recent_date
-
-        self.start_date_edit.setText(selected_date.strftime("%Y-%m-%d"))
-        if (
-            selected_date
-            > datetime.strptime(self.end_date_edit.text(), "%Y-%m-%d").date()
-        ):
-            self.end_date_edit.setText(selected_date.strftime("%Y-%m-%d"))
-
-        self.start_date_calendar.close()
-
-        if self.current_plot == "avgChanges":
-            self.show_avg_changes()
-        elif self.current_plot == "heatmap":
-            self.show_heatmap()
+        self.show_calendar(is_start_date=True)
 
     def show_end_date_calendar(self, event):
-        if not hasattr(self, "end_date_calendar"):
-            self.end_date_calendar = QCalendarWidget()
-            self.end_date_calendar.setGridVisible(True)
-            self.end_date_calendar.clicked.connect(self.update_end_date)
-            self.end_date_calendar.setWindowModality(Qt.ApplicationModal)
-        self.end_date_calendar.show()
+        self.show_calendar(is_start_date=False)
 
-    def update_end_date(self, date):
+    def update_date(self, date, is_start_date):
         selected_date = date.toPython()
-        # Ensure the selected end date is within the dataset's date range
-        if selected_date > self.most_recent_date:
-            selected_date = self.most_recent_date
-        elif selected_date < self.oldest_date:
-            selected_date = self.oldest_date
-
-        self.end_date_edit.setText(selected_date.strftime("%Y-%m-%d"))
-        if (
-            selected_date
-            < datetime.strptime(self.start_date_edit.text(), "%Y-%m-%d").date()
-        ):
+        # Ensure the selected date is within the dataset's date range
+        if is_start_date:
+            if selected_date < self.oldest_date:
+                selected_date = self.oldest_date
+            elif selected_date > self.most_recent_date:
+                selected_date = self.most_recent_date
             self.start_date_edit.setText(selected_date.strftime("%Y-%m-%d"))
+            if (
+                selected_date
+                > datetime.strptime(self.end_date_edit.text(), "%Y-%m-%d").date()
+            ):
+                self.end_date_edit.setText(selected_date.strftime("%Y-%m-%d"))
+        else:
+            if selected_date > self.most_recent_date:
+                selected_date = self.most_recent_date
+            elif selected_date < self.oldest_date:
+                selected_date = self.oldest_date
+            self.end_date_edit.setText(selected_date.strftime("%Y-%m-%d"))
+            if (
+                selected_date
+                < datetime.strptime(self.start_date_edit.text(), "%Y-%m-%d").date()
+            ):
+                self.start_date_edit.setText(selected_date.strftime("%Y-%m-%d"))
 
-        self.end_date_calendar.close()
+        if is_start_date:
+            self.start_date_calendar.close()
+        else:
+            self.end_date_calendar.close()
+
         if self.current_plot == "avgChanges":
             self.show_avg_changes()
         elif self.current_plot == "heatmap":
             self.show_heatmap()
+
+    def update_start_date(self, date):
+        self.update_date(date, is_start_date=True)
+
+    def update_end_date(self, date):
+        self.update_date(date, is_start_date=False)
 
     def show_graph(self):
         # Check if the graph is already displayed
@@ -420,12 +434,11 @@ class MainWindow(QMainWindow):
         self.end_date_edit.hide()
 
     def show_avg_changes(self):
+        if not self.validate_date_range():
+            return
+
         start_date_str = self.start_date_edit.text()
         end_date_str = self.end_date_edit.text()
-
-        if not start_date_str or not end_date_str:
-            QMessageBox.warning(self, "Warning", "Please select a valid date range.")
-            return
 
         avg_changes = self.data_processor.calculate_avg_percentage_changes(
             self.rows, start_date_str, end_date_str
@@ -468,12 +481,11 @@ class MainWindow(QMainWindow):
         self.toggle_date_selectors("avgChanges")
 
     def show_heatmap(self):
+        if not self.validate_date_range():
+            return
+
         start_date_str = self.start_date_edit.text()
         end_date_str = self.end_date_edit.text()
-
-        if not start_date_str or not end_date_str:
-            QMessageBox.warning(self, "Warning", "Please select a valid date range.")
-            return
 
         heatmap_data, min_val, max_val = self.data_processor.process_data_for_heatmap(
             self.rows, start_date_str, end_date_str
