@@ -130,45 +130,59 @@ class MainWindow(QMainWindow):
         self.setGeometry(100, 100, 800, 600)
         self.setMinimumSize(800, 600)
 
-        # Central Widget and Layout
         central_widget = QWidget(self)
         self.setCentralWidget(central_widget)
         main_layout = QVBoxLayout(central_widget)
 
-        # Matplotlib Figure
+        self.setup_matplotlib_figure(main_layout)
+        self.setup_open_csv_button(main_layout)
+        self.setup_show_graph_button(main_layout)
+        self.setup_avg_changes_button(main_layout)
+        self.setup_heatmap_button(main_layout)
+        self.setup_date_selection_widgets(main_layout)
+
+        self.show_avg_changes_button.hide()
+        self.show_heatmap_button.hide()
+        self.start_label.hide()
+        self.start_date_edit.hide()
+        self.end_label.hide()
+        self.end_date_edit.hide()
+
+    def setup_matplotlib_figure(self, main_layout):
         self.figure = Figure()
         self.canvas = FigureCanvas(self.figure)
         main_layout.addWidget(self.canvas, 1)
 
-        # Button to open CSV file
+    def setup_open_csv_button(self, main_layout):
         self.open_csv_button = QPushButton("Open CSV File", self)
         self.open_csv_button.clicked.connect(self.open_file_dialog)
         main_layout.addWidget(self.open_csv_button)
 
-        # Button to show the initial graph
+    def setup_show_graph_button(self, main_layout):
         self.show_graph_button = QPushButton("Show Graph", self)
         self.show_graph_button.clicked.connect(self.show_graph)
         main_layout.addWidget(self.show_graph_button)
         self.show_graph_button.hide()
 
-        # Create a layout for "Show Average % Changes on Weekday" button and its date selectors
+    def setup_avg_changes_button(self, main_layout):
         self.avg_changes_layout = QHBoxLayout()
         self.show_avg_changes_button = QPushButton(
             "Show Average % Changes on Weekday", self
         )
         self.show_avg_changes_button.clicked.connect(self.show_avg_changes)
         self.avg_changes_layout.addWidget(self.show_avg_changes_button)
+        main_layout.addLayout(self.avg_changes_layout)
 
-        # Create a layout for "Show heatmap per day" button and its date selectors
+    def setup_heatmap_button(self, main_layout):
         self.heatmap_layout = QHBoxLayout()
         self.show_heatmap_button = QPushButton("Show heatmap per day", self)
         self.show_heatmap_button.clicked.connect(self.show_heatmap)
         self.heatmap_layout.addWidget(self.show_heatmap_button)
+        main_layout.addLayout(self.heatmap_layout)
 
-        # Shared Layout for date selection
+    def setup_date_selection_widgets(self, main_layout):
         self.date_selection_layout = QHBoxLayout()
 
-        # Start and End Date Label and Text Field
         self.start_label = QLabel("Start:", self)
         self.start_date_edit = QLineEdit(self)
         self.start_date_edit.setReadOnly(True)
@@ -179,41 +193,24 @@ class MainWindow(QMainWindow):
         self.end_date_edit.setReadOnly(True)
         self.end_date_edit.mousePressEvent = self.show_end_date_calendar
 
-        # Add the start and end date widgets to the date selection layout
         self.date_selection_layout.addWidget(self.start_label)
         self.date_selection_layout.addWidget(self.start_date_edit)
         self.date_selection_layout.addWidget(self.end_label)
         self.date_selection_layout.addWidget(self.end_date_edit)
 
-        # Add the date selection layout to the avg_changes and heatmap layouts
         self.avg_changes_layout.addLayout(self.date_selection_layout)
-        # layout for heatmap button is not done to avoid parent errors. Instead it is handled in the toggle_date_selectors function
 
-        # Add the avg_changes and heatmap layouts to the main layout
-        main_layout.addLayout(self.avg_changes_layout)
-        main_layout.addLayout(self.heatmap_layout)
-
-        # Initialize the Start Date Calendar Widget
         self.start_date_calendar = QCalendarWidget()
         self.start_date_calendar.setGridVisible(True)
         self.start_date_calendar.clicked.connect(self.update_start_date)
         self.start_date_calendar.setWindowModality(Qt.ApplicationModal)
-        self.start_date_calendar.hide()  # Initially hide the calendar
+        self.start_date_calendar.hide()
 
-        # Initialize the End Date Calendar Widget
         self.end_date_calendar = QCalendarWidget()
         self.end_date_calendar.setGridVisible(True)
         self.end_date_calendar.clicked.connect(self.update_end_date)
         self.end_date_calendar.setWindowModality(Qt.ApplicationModal)
-        self.end_date_calendar.hide()  # Initially hide the calendar
-
-        # Initially hide the date selection UI elements and the heatmap button
-        self.show_avg_changes_button.hide()
-        self.show_heatmap_button.hide()
-        self.start_label.hide()
-        self.start_date_edit.hide()
-        self.end_label.hide()
-        self.end_date_edit.hide()
+        self.end_date_calendar.hide()
 
     def toggle_date_selectors(self, show_next_to=None):
         # Hide the date selectors initially
@@ -444,10 +441,20 @@ class MainWindow(QMainWindow):
             self.rows, start_date_str, end_date_str
         )
 
-        # Check if there's data to plot
         if not avg_changes:
             return
 
+        self.create_avg_changes_plot(avg_changes)
+        self.current_plot = "avgChanges"
+
+        self.start_label.show()
+        self.start_date_edit.show()
+        self.end_label.show()
+        self.end_date_edit.show()
+
+        self.toggle_date_selectors("avgChanges")
+
+    def create_avg_changes_plot(self, avg_changes):
         weekdays = [
             "Monday",
             "Tuesday",
@@ -466,19 +473,10 @@ class MainWindow(QMainWindow):
         ax.set_xlabel("Weekday")
         ax.set_ylabel("Average % Change")
         ax.set_title("Average % Change in Close Price by Weekday")
-        ax.set_xticks(range(len(weekdays)))  # Set tick locations
+        ax.set_xticks(range(len(weekdays)))
         ax.set_xticklabels(weekdays, rotation=45, ha="right")
 
         self.canvas.draw()
-        self.current_plot = "avgChanges"
-
-        # Show the date selection buttons
-        self.start_label.show()
-        self.start_date_edit.show()
-        self.end_label.show()
-        self.end_date_edit.show()
-
-        self.toggle_date_selectors("avgChanges")
 
     def show_heatmap(self):
         if not self.validate_date_range():
@@ -491,7 +489,17 @@ class MainWindow(QMainWindow):
             self.rows, start_date_str, end_date_str
         )
 
-        # Clear the current figure
+        self.create_heatmap_plot(heatmap_data, min_val, max_val)
+        self.current_plot = "heatmap"
+
+        self.start_label.show()
+        self.start_date_edit.show()
+        self.end_label.show()
+        self.end_date_edit.show()
+
+        self.toggle_date_selectors("heatmap")
+
+    def create_heatmap_plot(self, heatmap_data, min_val, max_val):
         self.figure.clear()
         self.figure.subplots_adjust(bottom=0.1)
         ax = self.figure.add_subplot(111)
@@ -504,32 +512,19 @@ class MainWindow(QMainWindow):
 
         cax = ax.matshow(heatmap_data, cmap=cmap, norm=norm)
 
-        # Add a colorbar
         cbar = self.figure.colorbar(cax, ax=ax)
         cbar.set_label("Average % Change")
 
-        # Annotate each cell
         for i in range(heatmap_data.shape[0]):
             for j in range(heatmap_data.shape[1]):
                 value = heatmap_data[i, j]
-                # Determine text color based on cell's value for better contrast
-                text_color = (
-                    "white" if abs(value) > 25 else "black"
-                )  # Adjust the threshold as needed
+                text_color = "white" if abs(value) > 25 else "black"
                 if i * 7 + j + 1 > 31:
                     continue
                 text = f"Day {i*7+j+1}\n{value:.1f}%"
                 ax.text(j, i, text, ha="center", va="center", color=text_color)
 
         self.canvas.draw()
-
-        # Update UI elements for the heatmap
-        self.start_label.show()
-        self.start_date_edit.show()
-        self.end_label.show()
-        self.end_date_edit.show()
-        self.current_plot = "heatmap"
-        self.toggle_date_selectors("heatmap")
 
 
 if __name__ == "__main__":
