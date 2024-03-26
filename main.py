@@ -26,11 +26,10 @@ import matplotlib.pyplot as plt
 app = QApplication(sys.argv)
 
 
-class MainWindow(QMainWindow):
+class DataProcessor:
     def __init__(self):
         super().__init__()
-        self.initUI()
-        self.currentPlot = None  # Track the current plot displayed
+        self.currentPlot = None
 
     def parseDate(self, date_str):
         date_formats = ["%Y-%m-%d %H:%M:%S", "%Y-%m-%d", "%Y/%m/%d"]
@@ -39,7 +38,92 @@ class MainWindow(QMainWindow):
                 return datetime.strptime(date_str, fmt)
             except ValueError:
                 continue
-        return None  # Return None if all parsing attempts fail
+        return None
+
+    def calculateAvgPercentageChanges(self, rows, start_date_str, end_date_str):
+        # Convert string dates to datetime objects
+        start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+        end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+
+        # Filter rows for those within the selected date range
+        filtered_rows = [
+            row
+            for row in rows
+            if start_date <= self.parseDate(row["date"]).date() <= end_date
+        ]
+
+        changes = defaultdict(lambda: {"total": 0, "count": 0})
+        sorted_rows = sorted(filtered_rows, key=lambda x: self.parseDate(x["date"]))
+
+        for i in range(1, len(sorted_rows)):
+            prev_row = sorted_rows[i - 1]
+            current_row = sorted_rows[i]
+
+            prev_close = float(prev_row["close"])
+            current_close = float(current_row["close"])
+            percentage_change = ((current_close - prev_close) / prev_close) * 100
+
+            current_date = self.parseDate(current_row["date"])
+            if current_date is None:  # Skip rows with unrecognized date formats
+                continue
+            weekday = current_date.strftime("%A")
+
+            changes[weekday]["total"] += percentage_change
+            changes[weekday]["count"] += 1
+
+        avg_changes = {
+            weekday: data["total"] / data["count"] for weekday, data in changes.items()
+        }
+
+        return avg_changes
+
+    def processDataForHeatmap(self, rows, start_date_str, end_date_str):
+        # Convert string dates to datetime objects
+        start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+        end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+
+        sorted_rows = sorted(rows, key=lambda x: self.parseDate(x["date"]))
+        daily_changes = defaultdict(lambda: {"sum": 0, "count": 0})
+        # Filter rows based on the selected date range
+        for row in sorted_rows:
+            date = self.parseDate(row["date"]).date()
+            if date < start_date or date > end_date:
+                continue  # Skip dates outside the selected range
+
+            if len(sorted_rows) > 1:
+                prev_close = float(sorted_rows[sorted_rows.index(row) - 1]["close"])
+                curr_close = float(row["close"])
+                if prev_close != 0:  # Avoid division by zero
+                    percentage_change = ((curr_close - prev_close) / prev_close) * 100
+                    daily_changes[date.day]["sum"] += percentage_change
+                    daily_changes[date.day]["count"] += 1
+
+        average_daily_changes = {
+            day: changes["sum"] / changes["count"]
+            for day, changes in daily_changes.items()
+            if changes["count"] > 0
+        }
+
+        # Initialize the matrix to accommodate 31 days across 5 rows and 7 columns
+        heatmap_data = np.zeros((5, 7))
+        for day, avg_change in average_daily_changes.items():
+            if day > 31:
+                continue
+            row = (day - 1) // 7
+            col = (day - 1) % 7
+            heatmap_data[row, col] = avg_change
+
+        min_change = min(heatmap_data.flatten(), default=0)
+        max_change = max(heatmap_data.flatten(), default=0)
+
+        return heatmap_data, min_change, max_change
+
+
+class MainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.data_processor = DataProcessor()
+        self.initUI()
 
     def initUI(self):
         self.setWindowTitle("CSV Viewer")
@@ -160,6 +244,103 @@ class MainWindow(QMainWindow):
             self.endLabel.setVisible(True)
             self.endDateEdit.setVisible(True)
 
+    def openFileDialog(self):
+        fileName, _ = QFileDialog.getOpenFileName(
+            self, "Open CSV File", "", "CSV Files (*.csv)"
+        )
+        if fileName:
+            self.loadData(fileName)
+
+    def loadData(self, filePath):
+        with open(filePath, "r", newline="", encoding="utf-8") as csvfile:
+            delimiter = csv.Sniffer().sniff(csvfile.readline()).delimiter
+            csvfile.seek(0)
+            reader = csv.DictReader(csvfile, delimiter=delimiter)
+            self.rows = list(reader)  # Store the data in an instance variable
+            self.plotData(self.rows)
+
+            # Show the buttons after data is loaded
+            self.plotData(self.rows)
+            self.currentPlot = (
+                "graph"  # Assume graph is the default plot shown after loading data
+            )
+            self.showGraphButton.show()
+            self.showAvgChangesButton.show()
+            self.showHeatmapButton.show()
+            self.startLabel.hide()
+            self.startDateEdit.hide()
+            self.endLabel.hide()
+            self.endDateEdit.hide()
+
+            # Reset current plot state
+            self.currentPlot = None
+
+            # Initialize the date range
+            self.initializeDateRange()
+
+    def initializeDateRange(self):
+        if self.rows:
+            dates = [
+                self.data_processor.parseDate(row["date"]).date()
+                for row in self.rows
+                if self.data_processor.parseDate(row["date"])
+            ]
+            self.oldestDate = min(dates)
+            self.mostRecentDate = max(dates)
+
+            # Update QLineEdit widgets to show the initial date range
+            self.startDateEdit.setText(self.oldestDate.strftime("%Y-%m-%d"))
+            self.endDateEdit.setText(self.mostRecentDate.strftime("%Y-%m-%d"))
+
+            # Update calendar widgets to set their minimum and maximum selectable dates
+            self.startDateCalendar.setMinimumDate(
+                QDate(self.oldestDate.year, self.oldestDate.month, self.oldestDate.day)
+            )
+            self.startDateCalendar.setMaximumDate(
+                QDate(
+                    self.mostRecentDate.year,
+                    self.mostRecentDate.month,
+                    self.mostRecentDate.day,
+                )
+            )
+            self.endDateCalendar.setMinimumDate(
+                QDate(self.oldestDate.year, self.oldestDate.month, self.oldestDate.day)
+            )
+            self.endDateCalendar.setMaximumDate(
+                QDate(
+                    self.mostRecentDate.year,
+                    self.mostRecentDate.month,
+                    self.mostRecentDate.day,
+                )
+            )
+
+    def plotData(self, rows):
+        # Keep the plotData method here
+        self.figure.clear()  # Clear the existing plot
+        self.figure.subplots_adjust(bottom=0.1)
+        ax = self.figure.add_subplot(111)  # Add a subplot
+
+        dates = [
+            self.data_processor.parseDate(row["date"])
+            for row in rows
+            if self.data_processor.parseDate(row["date"]) is not None
+        ]
+        closes = [float(row.get("close", "0")) for row in rows]
+
+        if None in dates:
+            # Log a warning if there were any unrecognized date formats
+            QMessageBox.warning(
+                self,
+                "Warning",
+                "Some dates were in an unrecognized format and were not plotted.",
+            )
+
+        ax.plot(dates, closes, marker="o", linestyle="-")  # Plot the data
+        ax.set_xlabel("Date")
+        ax.set_ylabel("Close")
+        ax.grid(True)
+        self.canvas.draw()
+
     def showStartDateCalendar(self, event):
         if not hasattr(self, "startDateCalendar"):
             self.startDateCalendar = QCalendarWidget()
@@ -216,145 +397,6 @@ class MainWindow(QMainWindow):
         elif self.currentPlot == "heatmap":
             self.showHeatmap()
 
-    def openFileDialog(self):
-        fileName, _ = QFileDialog.getOpenFileName(
-            self, "Open CSV File", "", "CSV Files (*.csv)"
-        )
-        if fileName:
-            self.loadData(fileName)
-
-    def initializeDateRange(self):
-        if self.rows:
-            dates = [
-                self.parseDate(row["date"]).date()
-                for row in self.rows
-                if self.parseDate(row["date"])
-            ]
-            self.oldestDate = min(dates)
-            self.mostRecentDate = max(dates)
-
-            # Update QLineEdit widgets to show the initial date range
-            self.startDateEdit.setText(self.oldestDate.strftime("%Y-%m-%d"))
-            self.endDateEdit.setText(self.mostRecentDate.strftime("%Y-%m-%d"))
-
-            # Update calendar widgets to set their minimum and maximum selectable dates
-            self.startDateCalendar.setMinimumDate(
-                QDate(self.oldestDate.year, self.oldestDate.month, self.oldestDate.day)
-            )
-            self.startDateCalendar.setMaximumDate(
-                QDate(
-                    self.mostRecentDate.year,
-                    self.mostRecentDate.month,
-                    self.mostRecentDate.day,
-                )
-            )
-            self.endDateCalendar.setMinimumDate(
-                QDate(self.oldestDate.year, self.oldestDate.month, self.oldestDate.day)
-            )
-            self.endDateCalendar.setMaximumDate(
-                QDate(
-                    self.mostRecentDate.year,
-                    self.mostRecentDate.month,
-                    self.mostRecentDate.day,
-                )
-            )
-
-    def loadData(self, filePath):
-        with open(filePath, "r", newline="", encoding="utf-8") as csvfile:
-            delimiter = csv.Sniffer().sniff(csvfile.readline()).delimiter
-            csvfile.seek(0)
-            reader = csv.DictReader(csvfile, delimiter=delimiter)
-            self.rows = list(reader)  # Store the data in an instance variable
-            self.plotData(self.rows)
-
-            # Show the buttons after data is loaded
-            self.plotData(self.rows)
-            self.currentPlot = (
-                "graph"  # Assume graph is the default plot shown after loading data
-            )
-            self.showGraphButton.show()
-            self.showAvgChangesButton.show()
-            self.showHeatmapButton.show()
-            self.startLabel.hide()
-            self.startDateEdit.hide()
-            self.endLabel.hide()
-            self.endDateEdit.hide()
-
-            # Reset current plot state
-            self.currentPlot = None
-
-            # Initialize the date range
-            self.initializeDateRange()
-
-    def plotData(self, rows):
-        self.figure.clear()  # Clear the existing plot
-        self.figure.subplots_adjust(bottom=0.1)
-        ax = self.figure.add_subplot(111)  # Add a subplot
-
-        dates = [
-            self.parseDate(row["date"])
-            for row in rows
-            if self.parseDate(row["date"]) is not None
-        ]
-        closes = [float(row.get("close", "0")) for row in rows]
-
-        if None in dates:
-            # Log a warning if there were any unrecognized date formats
-            QMessageBox.warning(
-                self,
-                "Warning",
-                "Some dates were in an unrecognized format and were not plotted.",
-            )
-
-        ax.plot(dates, closes, marker="o", linestyle="-")  # Plot the data
-        ax.set_xlabel("Date")
-        ax.set_ylabel("Close")
-        ax.grid(True)
-        self.canvas.draw()
-
-    def calculateAvgPercentageChanges(self):
-        if not hasattr(self, "rows") or not self.rows:
-            QMessageBox.warning(
-                self, "Warning", "No data available to calculate average % changes."
-            )
-            return {}
-
-        # Parse the start and end dates from the QLineEdit widgets
-        start_date = datetime.strptime(self.startDateEdit.text(), "%Y-%m-%d").date()
-        end_date = datetime.strptime(self.endDateEdit.text(), "%Y-%m-%d").date()
-
-        # Filter rows for those within the selected date range
-        filtered_rows = [
-            row
-            for row in self.rows
-            if start_date <= self.parseDate(row["date"]).date() <= end_date
-        ]
-
-        changes = defaultdict(lambda: {"total": 0, "count": 0})
-        sorted_rows = sorted(filtered_rows, key=lambda x: self.parseDate(x["date"]))
-
-        for i in range(1, len(sorted_rows)):
-            prev_row = sorted_rows[i - 1]
-            current_row = sorted_rows[i]
-
-            prev_close = float(prev_row["close"])
-            current_close = float(current_row["close"])
-            percentage_change = ((current_close - prev_close) / prev_close) * 100
-
-            current_date = self.parseDate(current_row["date"])
-            if current_date is None:  # Skip rows with unrecognized date formats
-                continue
-            weekday = current_date.strftime("%A")
-
-            changes[weekday]["total"] += percentage_change
-            changes[weekday]["count"] += 1
-
-        avg_changes = {
-            weekday: data["total"] / data["count"] for weekday, data in changes.items()
-        }
-
-        return avg_changes
-
     def showGraph(self):
         # Check if the graph is already displayed
         if self.currentPlot == "graph":
@@ -371,7 +413,16 @@ class MainWindow(QMainWindow):
         self.endDateEdit.hide()
 
     def showAvgChanges(self):
-        avg_changes = self.calculateAvgPercentageChanges()
+        start_date_str = self.startDateEdit.text()
+        end_date_str = self.endDateEdit.text()
+
+        if not start_date_str or not end_date_str:
+            QMessageBox.warning(self, "Warning", "Please select a valid date range.")
+            return
+
+        avg_changes = self.data_processor.calculateAvgPercentageChanges(
+            self.rows, start_date_str, end_date_str
+        )
 
         # Check if there's data to plot
         if not avg_changes:
@@ -408,50 +459,16 @@ class MainWindow(QMainWindow):
 
         self.toggleDateSelectors("avgChanges")
 
-    def processDataForHeatmap(self, start_date_str, end_date_str):
-        # Convert string dates to datetime objects
-        start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
-        end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
-
-        sorted_rows = sorted(self.rows, key=lambda x: self.parseDate(x["date"]))
-        daily_changes = defaultdict(lambda: {"sum": 0, "count": 0})
-        # Filter rows based on the selected date range
-        for row in sorted_rows:
-            date = self.parseDate(row["date"]).date()
-            if date < start_date or date > end_date:
-                continue  # Skip dates outside the selected range
-
-            if len(sorted_rows) > 1:
-                prev_close = float(sorted_rows[sorted_rows.index(row) - 1]["close"])
-                curr_close = float(row["close"])
-                if prev_close != 0:  # Avoid division by zero
-                    percentage_change = ((curr_close - prev_close) / prev_close) * 100
-                    daily_changes[date.day]["sum"] += percentage_change
-                    daily_changes[date.day]["count"] += 1
-
-        average_daily_changes = {
-            day: changes["sum"] / changes["count"]
-            for day, changes in daily_changes.items()
-            if changes["count"] > 0
-        }
-
-        # Initialize the matrix to accommodate 31 days across 5 rows and 7 columns
-        heatmap_data = np.zeros((5, 7))
-        for day, avg_change in average_daily_changes.items():
-            if day > 31:
-                continue
-            row = (day - 1) // 7
-            col = (day - 1) % 7
-            heatmap_data[row, col] = avg_change
-
-        min_change = min(heatmap_data.flatten(), default=0)
-        max_change = max(heatmap_data.flatten(), default=0)
-
-        return heatmap_data, min_change, max_change
-
     def showHeatmap(self):
-        heatmap_data, min_val, max_val = self.processDataForHeatmap(
-            self.startDateEdit.text(), self.endDateEdit.text()
+        start_date_str = self.startDateEdit.text()
+        end_date_str = self.endDateEdit.text()
+
+        if not start_date_str or not end_date_str:
+            QMessageBox.warning(self, "Warning", "Please select a valid date range.")
+            return
+
+        heatmap_data, min_val, max_val = self.data_processor.processDataForHeatmap(
+            self.rows, start_date_str, end_date_str
         )
 
         # Clear the current figure
